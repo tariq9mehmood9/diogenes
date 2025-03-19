@@ -19,6 +19,7 @@ from langchain_core.documents import Document
 import json
 import re
 from docx import Document as DocxDocument
+from PyPDF2 import PdfReader
 
 load_dotenv()
 
@@ -26,6 +27,15 @@ load_dotenv()
 def read_docx(file_path):
     doc = DocxDocument(file_path)
     text = "\n".join([para.text for para in doc.paragraphs])  # Extract all paragraphs
+    return text
+
+
+def read_pdf(file_path):
+    """Reads and extracts text from a PDF file."""
+    reader = PdfReader(file_path)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() + "\n"  # Extract text from each page
     return text
 
 
@@ -80,17 +90,17 @@ class ComplianceReport(BaseModel):
 class DocxViewerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("DOCX Content Viewer")
+        self.root.title("Document Content Viewer")
         self.root.geometry("800x600")
 
         # Create UI elements
         self.header_label = tk.Label(
-            root, text="DOCX Content Viewer", font=("Arial", 16, "bold")
+            root, text="Document Content Viewer", font=("Arial", 16, "bold")
         )
         self.header_label.pack(pady=10)
 
         self.upload_button = tk.Button(
-            root, text="Upload DOCX File", command=self.upload_file
+            root, text="Upload File (DOCX or PDF)", command=self.upload_file
         )
         self.upload_button.pack(pady=10)
 
@@ -148,29 +158,35 @@ Format your response as a JSON object with the following fields:
 
     def upload_file(self):
         file_path = filedialog.askopenfilename(
-            title="Select a DOCX file", filetypes=[("Word Documents", "*.docx")]
+            title="Select a File",
+            filetypes=[("Word Documents", "*.docx"), ("PDF Files", "*.pdf")],
         )
 
         if file_path:
             self.file_label.config(text=os.path.basename(file_path))
-            self.parse_docx(file_path)
+            if file_path.endswith(".docx"):
+                self.parse_file(file_path, file_type="docx")
+            elif file_path.endswith(".pdf"):
+                self.parse_file(file_path, file_type="pdf")
+            else:
+                self.content_area.insert(tk.END, "Unsupported file type.\n")
 
-    def parse_docx(self, file_path):
+    def parse_file(self, file_path, file_type):
         try:
             # Clear previous content
             self.content_area.delete(1.0, tk.END)
 
-            # Open and parse DOCX file
-            doc = docx.Document(file_path)
-
-            # Extract text from the DOCX file
-            full_text = []
-            for para in doc.paragraphs:
-                full_text.append(para.text)
+            # Read the file content
+            if file_type == "docx":
+                file_text = read_docx(file_path)
+            elif file_type == "pdf":
+                file_text = read_pdf(file_path)
+            else:
+                self.content_area.insert(tk.END, "Unsupported file type.\n")
+                return
 
             # Process the text with LangChain
-            board_memo_text = "\n".join(full_text)
-            chunks = self.text_splitter.split_text(board_memo_text)
+            chunks = self.text_splitter.split_text(file_text)
             docs = [LCDocument(page_content=chunk) for chunk in chunks]
             vector_store_memo = FAISS.from_documents(docs, self.embeddings)
 
@@ -255,12 +271,12 @@ Format your response as a JSON object with the following fields:
 
 
 if __name__ == "__main__":
-    # Check if python-docx is installed
+    # Check if required libraries are installed
     try:
         import docx
-    except ImportError:
-        print("python-docx module is not installed. Please install it using:")
-        print("pip install python-docx")
+        from PyPDF2 import PdfReader
+    except ImportError as e:
+        print(f"Required module not installed: {e}. Please install it using pip.")
         exit(1)
 
     root = tk.Tk()
