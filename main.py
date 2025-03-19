@@ -116,7 +116,7 @@ class DocxViewerApp:
         self.graph = Neo4jGraph(
             url="bolt://localhost:7687", username="neo4j", password="password"
         )
-        self.embeddings = OpenAIEmbeddings()
+        self.embeddings = OpenAIEmbeddings(disallowed_special=())
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=500, chunk_overlap=50
         )
@@ -185,6 +185,9 @@ Format your response as a JSON object with the following fields:
                 self.content_area.insert(tk.END, "Unsupported file type.\n")
                 return
 
+            # Clean the text to remove special tokens that might cause issues
+            file_text = file_text.replace('<|endoftext|>', '')
+            
             # Process the text with LangChain
             chunks = self.text_splitter.split_text(file_text)
             docs = [LCDocument(page_content=chunk) for chunk in chunks]
