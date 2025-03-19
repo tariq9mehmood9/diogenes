@@ -122,6 +122,7 @@ class DocxViewerApp:
         )
         self.llm = ChatOpenAI(
             model_name="gpt-4o-mini",
+            temperature=0.1,
             model_kwargs={"response_format": {"type": "json_object"}},
         )
         self.parser = PydanticOutputParser(pydantic_object=ComplianceReport)
@@ -209,7 +210,7 @@ Format your response as a JSON object with the following fields:
 
                     if key_indicator:
                         self.content_area.insert(
-                            tk.END, f"**Practice:** {practice['id']}\n"
+                            tk.END, f"**Practice** {practice['id']}: {practice['description']}\n"
                         )
                         self.content_area.insert(
                             tk.END, f"**Key Indicator:** {key_indicator['question']}\n"
@@ -231,6 +232,10 @@ Format your response as a JSON object with the following fields:
                                 tk.END,
                                 f"**Corrective measures:** {report.corrective_measures}\n\n",
                             )
+                self.content_area.insert(
+                    tk.END,
+                    f"\n\n",
+                )
 
         except Exception as e:
             self.content_area.insert(tk.END, f"Error parsing file: {str(e)}\n")
