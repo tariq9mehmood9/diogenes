@@ -14,6 +14,7 @@ from PyPDF2 import PdfReader
 import streamlit as st
 import numpy as np
 import re
+import time
 
 load_dotenv()
 
@@ -189,29 +190,57 @@ def main():
                     )
                     st.markdown(f"**Key Indicator:** {key_indicator['question']}")
 
+                    # Create placeholders for the streaming effect
+                    status_placeholder = st.empty()
+                    confidence_placeholder = st.empty()
+                    cause_placeholder = st.empty()
+                    measures_placeholder = st.empty()
+                    separator_placeholder = st.empty()
+
+                    # Get the compliance report
                     report = check_compliance(
                         practice["description"],
                         key_indicator["question"],
                         vector_store_memo,
                     )
 
+                    # Extract confidence information
+                    confidence = ""
                     for logprob in report.response_metadata["logprobs"]["content"]:
                         if logprob["token"] == "Pass" or logprob["token"] == "Fail":
-                            confidence = f"Prob('{logprob['token']}'): {np.exp(logprob['logprob']):.4f}"
+                            confidence = f"{np.exp(logprob['logprob']):.4f}"
 
+                    # Parse the report
                     report = parser.parse(report.content)
 
-                    if report.status == "Pass":
-                        st.markdown(f"**Status:** :green[{report.status}]")
-                    else:
-                        st.markdown(f"**Status:** :red[{report.status}]")
-                    st.markdown(f"**Confidence:** {confidence}")
-                    st.markdown(f"**Cause:** {report.causality}")
-                    st.markdown(
-                        f"**Corrective measures:** {report.corrective_measures}"
-                    )
-
-                    st.markdown("---")  # Horizontal line as separator
+                    # Display status with streaming effect
+                    
+                    # Status
+                    status_text = f"**Status:** {'🟢 ' if report.status == 'Pass' else '🔴 '}{report.status}"
+                    for i in range(len(status_text) + 1):
+                        status_placeholder.markdown(status_text[:i])
+                        time.sleep(0.001)
+                    
+                    # Confidence
+                    conf_text = f"**Confidence:** {confidence}"
+                    for i in range(len(conf_text) + 1):
+                        confidence_placeholder.markdown(conf_text[:i])
+                        time.sleep(0.001)
+                    
+                    # Cause
+                    cause_text = f"**Cause:** {report.causality}"
+                    for i in range(len(cause_text) + 1):
+                        cause_placeholder.markdown(cause_text[:i])
+                        time.sleep(0.001)
+                    
+                    # Corrective measures
+                    measures_text = f"**Corrective measures:** {report.corrective_measures}"
+                    for i in range(len(measures_text) + 1):
+                        measures_placeholder.markdown(measures_text[:i])
+                        time.sleep(0.001)
+                    
+                    # Separator
+                    separator_placeholder.markdown("---")  # Horizontal line as separator
 
 
 if __name__ == "__main__":
