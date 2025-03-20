@@ -19,6 +19,7 @@ import json
 import re
 from docx import Document as DocxDocument
 from PyPDF2 import PdfReader
+import numpy as np
 
 load_dotenv()
 
@@ -100,6 +101,7 @@ text_splitter = RecursiveCharacterTextSplitter(
 llm = ChatOpenAI(
     model_name="gpt-4o-mini",
     temperature=0.1,
+    logprobs=True,
     model_kwargs={"response_format": {"type": "json_object"}},
 )
 parser = PydanticOutputParser(pydantic_object=ComplianceReport)
@@ -130,9 +132,10 @@ Format your response as a JSON object with the following fields:
 """,
             input_variables=["practice", "key_indicator", "context"],
         )
-compliance_chain = LLMChain(
-    llm=llm, prompt=prompt_template, output_key="compliance_report"
-)
+# compliance_chain = LLMChain(
+#     llm=llm, prompt=prompt_template, output_key="compliance_report"
+# )
+compliance_chain = prompt_template | llm
 
 def check_compliance(practice_statement, key_indicator, vector_store, k=5):
     # Retrieve relevant documents
@@ -156,14 +159,15 @@ def check_compliance(practice_statement, key_indicator, vector_store, k=5):
             "context": context,
         }
     )
+    return result
 
-    # Parse the JSON string into a ComplianceReport object
-    try:
-        json_str = result["compliance_report"]
-        parsed_json = json.loads(json_str)
-        return ComplianceReport(**parsed_json)
-    except Exception as e:
-        return f"Failed to parse result into ComplianceReport model. Error: {e}\n"
+    # # Parse the JSON string into a ComplianceReport object
+    # try:
+    #     json_str = result["compliance_report"]
+    #     parsed_json = json.loads(json_str)
+    #     return ComplianceReport(**parsed_json)
+    # except Exception as e:
+    #     return f"Failed to parse result into ComplianceReport model. Error: {e}\n"
 
 # Streamlit App
 def main():
@@ -209,13 +213,20 @@ def main():
                         key_indicator["question"],
                         vector_store_memo,
                     )
-                    if report:
-                        if report.status == "Pass":
-                            st.markdown(f"**Status:** :green[{report.status}]")
-                        else:
-                            st.markdown(f"**Status:** :red[{report.status}]")
-                        st.markdown(f"**Cause:** {report.causality}")
-                        st.markdown(f"**Corrective measures:** {report.corrective_measures}")
+
+                    for logprob in report.response_metadata['logprobs']['content']:
+                        if logprob['token'] == 'Pass' or logprob['token'] == 'Fail':
+                            confidence = f"Prob('{logprob['token']}'): {np.exp(logprob['logprob']):.4f}"
+
+                    report = parser.parse(report.content)
+
+                    if report.status == "Pass":
+                        st.markdown(f"**Status:** :green[{report.status}]")
+                    else:
+                        st.markdown(f"**Status:** :red[{report.status}]")
+                    st.markdown(f"**Confidence:** {confidence}")
+                    st.markdown(f"**Cause:** {report.causality}")
+                    st.markdown(f"**Corrective measures:** {report.corrective_measures}")
                     
                     st.markdown("---")  # Horizontal line as separator
 
