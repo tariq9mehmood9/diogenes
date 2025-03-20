@@ -160,6 +160,7 @@ def main():
         
         # Create dictionary to store weights for each practice and its key indicators
         weights = {}
+        weight_validation = {}
         
         # Initialize weights for all practices and their key indicators
         for principle in principles:
@@ -178,10 +179,12 @@ def main():
                     # Store weights for each key indicator
                     if practice_id not in weights:
                         weights[practice_id] = {}
+                        weight_validation[practice_id] = {"total": 0, "valid": False}
                     
                     # Count key indicators for this practice
                     ki_count = len(result)
                     default_weight = 100 // ki_count if ki_count > 0 else 100
+                    remaining_weight = 100 - (default_weight * (ki_count - 1)) if ki_count > 0 else 0
                     
                     # Create an expander for each practice
                     with st.expander(f"Practice {practice_id}"):
@@ -190,19 +193,38 @@ def main():
                             ki = record["ki"]
                             ki_id = ki["id"] if "id" in ki else f"{practice_id}-ki-{i}"
                             
+                            # Last key indicator gets remaining weight to ensure total is 100
+                            this_default = remaining_weight if i == ki_count - 1 else default_weight
+                            
                             # Create slider for each key indicator
                             weight = st.slider(
                                 f"KI: {ki['question'][:30]}...",
                                 min_value=0,
                                 max_value=100,
-                                value=default_weight,
+                                value=this_default,
                                 key=f"weight_{practice_id}_{ki_id}"
                             )
                             weights[practice_id][ki_id] = weight
                             total_weight += weight
                         
                         # Show total weight
-                        st.info(f"Total weight: {total_weight}% {'(OK)' if total_weight == 100 else '(should be 100%)'}")
+                        status = "OK" if total_weight == 100 else "should be 100%"
+                        st.info(f"Total weight: {total_weight}% ({status})")
+                        weight_validation[practice_id]["total"] = total_weight
+                        weight_validation[practice_id]["valid"] = (total_weight == 100)
+        
+        # Add reset button to set equal weights
+        if st.button("Reset to Equal Weights"):
+            st.rerun()
+        
+        # Add submit button to check weights
+        submit_disabled = not all(data["valid"] for data in weight_validation.values())
+        submit_button = st.button("Submit Weights", disabled=submit_disabled)
+        
+        if submit_disabled:
+            st.error("Please ensure all practice weights sum to 100% before submitting.")
+        elif submit_button:
+            st.success("Weights validated and saved successfully!")
 
     uploaded_file = st.file_uploader("Upload a DOCX or PDF file", type=["pdf", "docx"])
 
