@@ -182,75 +182,88 @@ def main():
                     params={"practice_id": practice["id"]},
                 )
 
-                for record in result:
-                    key_indicator = record["ki"]
-
-                    if key_indicator:
-                        if not ki_status:
-                            st.markdown(
-                                f"#### practice {practice['id']}: {practice['description']}"
-                            )
-                        st.markdown(f"**Key Indicator:** {key_indicator['question']}")
-
-                        # Create placeholders for the streaming effect
-                        status_placeholder = st.empty()
-                        confidence_placeholder = st.empty()
-                        cause_placeholder = st.empty()
-                        measures_placeholder = st.empty()
-
-                        # Get the compliance report
-                        report = check_compliance(
-                            practice["description"],
-                            key_indicator["question"],
-                            vector_store_memo,
+                # Create a practice-level container
+                if result:
+                    practice_container = st.container()
+                    
+                    # Display practice information in the container
+                    with practice_container:
+                        st.markdown(
+                            f"#### Practice {practice['id']}: {practice['description']}"
                         )
+                        
+                        for record in result:
+                            key_indicator = record["ki"]
 
-                        # Extract confidence information
-                        confidence = ""
-                        for logprob in report.response_metadata["logprobs"]["content"]:
-                            if logprob["token"] == "Pass" or logprob["token"] == "Fail":
-                                confidence = f"{np.exp(logprob['logprob']):.4f}"
+                            if key_indicator:
+                                # Create a container for each key indicator set
+                                ki_container = st.container()
+                                
+                                with ki_container:
+                                    st.markdown(f"**Key Indicator:** {key_indicator['question']}")
 
-                        # Parse the report
-                        report = parser.parse(report.content)
-                        ki_status.append(report.status)
+                                    # Create placeholders for the streaming effect
+                                    status_placeholder = st.empty()
+                                    confidence_placeholder = st.empty()
+                                    cause_placeholder = st.empty()
+                                    measures_placeholder = st.empty()
 
-                        # Display status with streaming effect
-                        
-                        # Status
-                        status_text = f"**Status:** {'🟢 ' if report.status == 'Pass' else '🔴 '}{report.status}"
-                        for i in range(len(status_text) + 1):
-                            status_placeholder.markdown(status_text[:i])
-                            time.sleep(0.001)
-                        
-                        # Confidence
-                        conf_text = f"**Confidence:** {confidence}"
-                        for i in range(len(conf_text) + 1):
-                            confidence_placeholder.markdown(conf_text[:i])
-                            time.sleep(0.001)
-                        
-                        # Cause
-                        cause_text = f"**Cause:** {report.causality}"
-                        for i in range(len(cause_text) + 1):
-                            cause_placeholder.markdown(cause_text[:i])
-                            time.sleep(0.001)
-                        
-                        # Corrective measures
-                        measures_text = f"**Corrective measures:** {report.corrective_measures}"
-                        for i in range(len(measures_text) + 1):
-                            measures_placeholder.markdown(measures_text[:i])
-                            time.sleep(0.001)
-                        
-                # Display the overall compliance status for the principle
-                if ki_status:
-                    failed_count = sum(1 for status in ki_status if status == "Fail")
-                    total_count = len(ki_status)
-                    principle_status = "Pass" if failed_count == 0 else "Fail"
-                    st.markdown(f"### Practice {practice['id']} Compliance Status")
-                    st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status} ({failed_count}/{total_count} key indicators failed)")
+                                    # Get the compliance report
+                                    report = check_compliance(
+                                        practice["description"],
+                                        key_indicator["question"],
+                                        vector_store_memo,
+                                    )
 
-                    # Separator
-                    st.markdown("---")  # Horizontal line as separator
+                                    # Extract confidence information
+                                    confidence = ""
+                                    for logprob in report.response_metadata["logprobs"]["content"]:
+                                        if logprob["token"] == "Pass" or logprob["token"] == "Fail":
+                                            confidence = f"{np.exp(logprob['logprob']):.4f}"
+
+                                    # Parse the report
+                                    report = parser.parse(report.content)
+                                    ki_status.append(report.status)
+
+                                    # Display status with streaming effect
+                                    
+                                    # Status
+                                    status_text = f"**Status:** {'🟢 ' if report.status == 'Pass' else '🔴 '}{report.status}"
+                                    for i in range(len(status_text) + 1):
+                                        status_placeholder.markdown(status_text[:i])
+                                        time.sleep(0.001)
+                                    
+                                    # Confidence
+                                    conf_text = f"**Confidence:** {confidence}"
+                                    for i in range(len(conf_text) + 1):
+                                        confidence_placeholder.markdown(conf_text[:i])
+                                        time.sleep(0.001)
+                                    
+                                    # Cause
+                                    cause_text = f"**Cause:** {report.causality}"
+                                    for i in range(len(cause_text) + 1):
+                                        cause_placeholder.markdown(cause_text[:i])
+                                        time.sleep(0.001)
+                                    
+                                    # Corrective measures
+                                    measures_text = f"**Corrective measures:** {report.corrective_measures}"
+                                    for i in range(len(measures_text) + 1):
+                                        measures_placeholder.markdown(measures_text[:i])
+                                        time.sleep(0.001)
+                                    
+                                    # Add a small separator between key indicators
+                                    st.write("---")
+                        
+                        # Display the overall compliance status for the practice
+                        if ki_status:
+                            failed_count = sum(1 for status in ki_status if status == "Fail")
+                            total_count = len(ki_status)
+                            principle_status = "Pass" if failed_count == 0 else "Fail"
+                            st.markdown(f"### Practice {practice['id']} Compliance Status")
+                            st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status} ({failed_count}/{total_count} key indicators failed)")
+
+                            # Separator between practices
+                            st.markdown("---")
 
 if __name__ == "__main__":
     main()
