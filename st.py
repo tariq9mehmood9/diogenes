@@ -1,25 +1,19 @@
-import streamlit as st
-import docx
-import os
 from langchain_neo4j import Neo4jGraph
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document as LCDocument
-from langchain.llms import OpenAI
 from dotenv import load_dotenv
-from pprint import pprint
 from pydantic import BaseModel, Field
-from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.documents import Document
-import json
-import re
 from docx import Document as DocxDocument
 from PyPDF2 import PdfReader
+import streamlit as st
 import numpy as np
+import re
 
 load_dotenv()
 
@@ -91,13 +85,9 @@ class ComplianceReport(BaseModel):
 
 
 # Initialize LangChain components
-graph = Neo4jGraph(
-    url="bolt://localhost:7687", username="neo4j", password="password"
-)
+graph = Neo4jGraph(url="bolt://localhost:7687", username="neo4j", password="password")
 embeddings = OpenAIEmbeddings(disallowed_special=())
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500, chunk_overlap=50
-)
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
 llm = ChatOpenAI(
     model_name="gpt-4o-mini",
     temperature=0.1,
@@ -130,18 +120,14 @@ Format your response as a JSON object with the following fields:
 
 ### Answer:
 """,
-            input_variables=["practice", "key_indicator", "context"],
-        )
-# compliance_chain = LLMChain(
-#     llm=llm, prompt=prompt_template, output_key="compliance_report"
-# )
+    input_variables=["practice", "key_indicator", "context"],
+)
 compliance_chain = prompt_template | llm
+
 
 def check_compliance(practice_statement, key_indicator, vector_store, k=5):
     # Retrieve relevant documents
-    retrieved_docs = vector_store.similarity_search_with_score(
-        practice_statement, k=k
-    )
+    retrieved_docs = vector_store.similarity_search_with_score(practice_statement, k=k)
 
     # Format retrieved documents into a structured context
     context = "\n\n".join(
@@ -161,23 +147,16 @@ def check_compliance(practice_statement, key_indicator, vector_store, k=5):
     )
     return result
 
-    # # Parse the JSON string into a ComplianceReport object
-    # try:
-    #     json_str = result["compliance_report"]
-    #     parsed_json = json.loads(json_str)
-    #     return ComplianceReport(**parsed_json)
-    # except Exception as e:
-    #     return f"Failed to parse result into ComplianceReport model. Error: {e}\n"
 
 # Streamlit App
 def main():
     st.title("CyberGov Powered by Diogenes")
-    
+
     uploaded_file = st.file_uploader("Upload a DOCX or PDF file", type=["pdf", "docx"])
-    
+
     if uploaded_file is not None:
         file_extension = uploaded_file.name.split(".")[-1].lower()
-        
+
         if file_extension == "pdf":
             text = read_pdf(uploaded_file)
         elif file_extension == "docx":
@@ -185,7 +164,7 @@ def main():
         else:
             st.error("Unsupported file format.")
             return
-        
+
         chunks = text_splitter.split_text(text)
         docs = [LCDocument(page_content=chunk) for chunk in chunks]
         vector_store_memo = FAISS.from_documents(docs, embeddings)
@@ -205,7 +184,9 @@ def main():
                 key_indicator = record["ki"]
 
                 if key_indicator:
-                    st.markdown(f"#### Practice {practice['id']}: {practice['description']}")
+                    st.markdown(
+                        f"#### Practice {practice['id']}: {practice['description']}"
+                    )
                     st.markdown(f"**Key Indicator:** {key_indicator['question']}")
 
                     report = check_compliance(
@@ -214,8 +195,8 @@ def main():
                         vector_store_memo,
                     )
 
-                    for logprob in report.response_metadata['logprobs']['content']:
-                        if logprob['token'] == 'Pass' or logprob['token'] == 'Fail':
+                    for logprob in report.response_metadata["logprobs"]["content"]:
+                        if logprob["token"] == "Pass" or logprob["token"] == "Fail":
                             confidence = f"Prob('{logprob['token']}'): {np.exp(logprob['logprob']):.4f}"
 
                     report = parser.parse(report.content)
@@ -226,9 +207,12 @@ def main():
                         st.markdown(f"**Status:** :red[{report.status}]")
                     st.markdown(f"**Confidence:** {confidence}")
                     st.markdown(f"**Cause:** {report.causality}")
-                    st.markdown(f"**Corrective measures:** {report.corrective_measures}")
-                    
+                    st.markdown(
+                        f"**Corrective measures:** {report.corrective_measures}"
+                    )
+
                     st.markdown("---")  # Horizontal line as separator
+
 
 if __name__ == "__main__":
     main()
