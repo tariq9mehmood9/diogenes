@@ -153,6 +153,57 @@ def check_compliance(practice_statement, key_indicator, vector_store, k=5):
 def main():
     st.title("CyberGov Powered by Diogenes")
 
+    # Add sidebar for weights configuration
+    with st.sidebar:
+        st.title("Key Indicator Weights")
+        st.markdown("Adjust the importance of each key indicator (in %)")
+        
+        # Create dictionary to store weights for each practice and its key indicators
+        weights = {}
+        
+        # Initialize weights for all practices and their key indicators
+        for principle in principles:
+            for practice in principle['practices']:
+                practice_id = practice["id"]
+                result = graph.query(
+                    """
+                    MATCH (pr:Practice)-[:HAS_KEY_INDICATOR]->(ki:KeyIndicator)
+                    WHERE pr.id = $practice_id
+                    RETURN ki;
+                    """,
+                    params={"practice_id": practice_id},
+                )
+                
+                if result:
+                    # Store weights for each key indicator
+                    if practice_id not in weights:
+                        weights[practice_id] = {}
+                    
+                    # Count key indicators for this practice
+                    ki_count = len(result)
+                    default_weight = 100 // ki_count if ki_count > 0 else 100
+                    
+                    # Create an expander for each practice
+                    with st.expander(f"Practice {practice_id}"):
+                        total_weight = 0
+                        for i, record in enumerate(result):
+                            ki = record["ki"]
+                            ki_id = ki["id"] if "id" in ki else f"{practice_id}-ki-{i}"
+                            
+                            # Create slider for each key indicator
+                            weight = st.slider(
+                                f"KI: {ki['question'][:30]}...",
+                                min_value=0,
+                                max_value=100,
+                                value=default_weight,
+                                key=f"weight_{practice_id}_{ki_id}"
+                            )
+                            weights[practice_id][ki_id] = weight
+                            total_weight += weight
+                        
+                        # Show total weight
+                        st.info(f"Total weight: {total_weight}% {'(OK)' if total_weight == 100 else '(should be 100%)'}")
+
     uploaded_file = st.file_uploader("Upload a DOCX or PDF file", type=["pdf", "docx"])
 
     if uploaded_file is not None:
@@ -173,13 +224,15 @@ def main():
         for principle in principles:
             for practice in principle['practices']:
                 ki_status = []
+                ki_weights = []
+                practice_id = practice["id"]
                 result = graph.query(
                     """
                     MATCH (pr:Practice)-[:HAS_KEY_INDICATOR]->(ki:KeyIndicator)
                     WHERE pr.id = $practice_id
                     RETURN ki;
                     """,
-                    params={"practice_id": practice["id"]},
+                    params={"practice_id": practice_id},
                 )
 
                 # Create a practice-level container
@@ -192,15 +245,19 @@ def main():
                             f"#### Practice {practice['id']}: {practice['description']}"
                         )
                         
-                        for record in result:
+                        for i, record in enumerate(result):
                             key_indicator = record["ki"]
 
                             if key_indicator:
                                 # Create a container for each key indicator set
                                 ki_container = st.container()
                                 
+                                # Get key indicator ID for weight lookup
+                                ki_id = key_indicator["id"] if "id" in key_indicator else f"{practice_id}-ki-{i}"
+                                ki_weight = weights.get(practice_id, {}).get(ki_id, 100 // len(result))
+                                
                                 with ki_container:
-                                    st.markdown(f"**Key Indicator:** {key_indicator['question']}")
+                                    st.markdown(f"**Key Indicator:** {key_indicator['question']} (Weight: {ki_weight}%)")
 
                                     # Create placeholders for the streaming effect
                                     status_placeholder = st.empty()
@@ -224,6 +281,7 @@ def main():
                                     # Parse the report
                                     report = parser.parse(report.content)
                                     ki_status.append(report.status)
+                                    ki_weights.append(ki_weight)
 
                                     # Display status with streaming effect
                                     
@@ -256,11 +314,22 @@ def main():
                         
                         # Display the overall compliance status for the practice
                         if ki_status:
+                            # Calculate weighted compliance
+                            failed_weight = sum(weight for status, weight in zip(ki_status, ki_weights) if status == "Fail")
+                            total_weight = sum(ki_weights)
+                            failure_percentage = failed_weight / total_weight * 100 if total_weight > 0 else 0
+                            
+                            # Count traditional metrics as well
                             failed_count = sum(1 for status in ki_status if status == "Fail")
                             total_count = len(ki_status)
-                            principle_status = "Pass" if failed_count == 0 else "Fail"
+                            
+                            # Determine if practice passes overall (based on weights)
+                            principle_status = "Pass" if failed_weight == 0 else "Fail"
+                            
                             st.markdown(f"### Practice {practice['id']} Compliance Status")
-                            st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status} ({failed_count}/{total_count} key indicators failed)")
+                            st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status}")
+                            st.markdown(f"**Failed weight:** {failed_weight:.1f}/{total_weight} ({failure_percentage:.1f}%)")
+                            st.markdown(f"**Failed indicators:** {failed_count}/{total_count}")
 
                             # Separator between practices
                             st.markdown("---")
