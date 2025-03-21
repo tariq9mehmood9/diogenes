@@ -272,14 +272,14 @@ def main():
 
                             if key_indicator:
                                 # Create a container for each key indicator set
-                                ki_container = st.container()
+                                ki_container = st.status(key_indicator["question"], expanded=False, state='running')
                                 
                                 # Get key indicator ID for weight lookup
                                 ki_id = key_indicator["id"] if "id" in key_indicator else f"{practice_id}-ki-{i}"
                                 ki_weight = weights.get(practice_id, {}).get(ki_id, 100 // len(result))
                                 
                                 with ki_container:
-                                    st.markdown(f"**Key Indicator:** {key_indicator['question']} (Weight: {ki_weight}%)")
+                                    # st.markdown(f"**Key Indicator:** {key_indicator['question']} (Weight: {ki_weight}%)")
 
                                     # Create placeholders for the streaming effect
                                     status_placeholder = st.empty()
@@ -298,7 +298,7 @@ def main():
                                     confidence = ""
                                     for logprob in report.response_metadata["logprobs"]["content"]:
                                         if logprob["token"] == "Pass" or logprob["token"] == "Fail":
-                                            confidence = f"{np.exp(logprob['logprob']):.4f}"
+                                            confidence = f"{np.exp(logprob['logprob'])*100:.2f}%"
 
                                     # Parse the report
                                     report = parser.parse(report.content)
@@ -331,8 +331,9 @@ def main():
                                         measures_placeholder.markdown(measures_text[:i])
                                         time.sleep(0.001)
                                     
+                                    ki_container.update(state="complete") if report.status == "Pass" else ki_container.update(state="error")
                                     # Add a small separator between key indicators
-                                    st.write("---")
+                                    # st.write("---")
                         
                         # Display the overall compliance status for the practice
                         if ki_status:
@@ -348,10 +349,10 @@ def main():
                             # Determine if practice passes overall (based on weights)
                             principle_status = "Pass" if failed_weight == 0 else "Fail"
                             
-                            st.markdown(f"### Practice {practice['id']} Compliance Status")
+                            st.markdown(f"### Compliance Status")
                             st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status}")
-                            st.markdown(f"**Failed weight:** {failed_weight:.1f}/{total_weight} ({failure_percentage:.1f}%)")
-                            st.markdown(f"**Failed indicators:** {failed_count}/{total_count}")
+                            st.markdown(f"**Confidence:** {failure_percentage:.1f}%")
+                            st.markdown(f"**Failed Indicators:** {failed_count}/{total_count}")
 
                             # Separator between practices
                             st.markdown("---")
