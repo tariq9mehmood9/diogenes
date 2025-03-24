@@ -354,8 +354,19 @@ def main():
                             
                             st.markdown(f"### Compliance Status")
                             st.markdown(f"**Failed Indicators:** {failed_count}/{total_count}")
+                            st.markdown(
+                                """
+                                <style>
+                                    .stProgress > div > div > div > div {
+                                        background-color: green;
+                                    }
+                                    .stProgress > div > div > div {
+                                        background-color: red;
+                                    }
+                                </style>""",
+                                unsafe_allow_html=True,
+                            )
                             st.progress(pass_percentage/100, text=f"**Pass:** {pass_percentage:.1f}%")
-                            st.progress(fail_percentage/100, text=f"**Fail:** {fail_percentage:.1f}%")
                             st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status}")
 
                             # Separator between practices
