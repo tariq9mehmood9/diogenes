@@ -247,6 +247,7 @@ def main():
             for practice in principle['practices']:
                 ki_status = []
                 ki_weights = []
+                ki_conf_levels = []
                 practice_id = practice["id"]
                 result = graph.query(
                     """
@@ -272,7 +273,7 @@ def main():
 
                             if key_indicator:
                                 # Create a container for each key indicator set
-                                ki_container = st.status(key_indicator["question"], expanded=False, state='running')
+                                ki_container = st.status(f"K{i+1}: {key_indicator['question']}", expanded=False, state='running')
                                 
                                 # Get key indicator ID for weight lookup
                                 ki_id = key_indicator["id"] if "id" in key_indicator else f"{practice_id}-ki-{i}"
@@ -298,12 +299,13 @@ def main():
                                     confidence = ""
                                     for logprob in report.response_metadata["logprobs"]["content"]:
                                         if logprob["token"] == "Pass" or logprob["token"] == "Fail":
-                                            confidence = f"{np.exp(logprob['logprob'])*100:.2f}%"
+                                            confidence = np.exp(logprob['logprob'])*100
 
                                     # Parse the report
                                     report = parser.parse(report.content)
                                     ki_status.append(report.status)
                                     ki_weights.append(ki_weight)
+                                    ki_conf_levels.append(confidence)
 
                                     # Display status with streaming effect
                                     
@@ -314,7 +316,7 @@ def main():
                                         time.sleep(0.001)
                                     
                                     # Confidence
-                                    conf_text = f"**Confidence:** {confidence}"
+                                    conf_text = f"**Confidence:** {confidence:.2f}%"
                                     for i in range(len(conf_text) + 1):
                                         confidence_placeholder.markdown(conf_text[:i])
                                         time.sleep(0.001)
@@ -337,22 +339,24 @@ def main():
                         
                         # Display the overall compliance status for the practice
                         if ki_status:
-                            # Calculate weighted compliance
-                            failed_weight = sum(weight for status, weight in zip(ki_status, ki_weights) if status == "Fail")
-                            total_weight = sum(ki_weights)
-                            failure_percentage = failed_weight / total_weight * 100 if total_weight > 0 else 0
+                            # Calculate weighted average of confidence levels
+                            fail_conf = sum(weight*conf_level for status, weight, conf_level in zip(ki_status, ki_weights, ki_conf_levels) if status == "Fail")
+                            fail_percentage = fail_conf / 100
+                            pass_percentage = 100 - fail_percentage
+                            
                             
                             # Count traditional metrics as well
                             failed_count = sum(1 for status in ki_status if status == "Fail")
                             total_count = len(ki_status)
                             
-                            # Determine if practice passes overall (based on weights)
-                            principle_status = "Pass" if failed_weight == 0 else "Fail"
+                            # Determine if practice passes overall
+                            principle_status = "Pass" if failed_count < total_count // 2 else "Fail"
                             
                             st.markdown(f"### Compliance Status")
-                            st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status}")
-                            st.markdown(f"**Confidence:** {failure_percentage:.1f}%")
                             st.markdown(f"**Failed Indicators:** {failed_count}/{total_count}")
+                            st.progress(pass_percentage/100, text=f"**Pass:** {pass_percentage:.1f}%")
+                            st.progress(fail_percentage/100, text=f"**Fail:** {fail_percentage:.1f}%")
+                            st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status}")
 
                             # Separator between practices
                             st.markdown("---")
