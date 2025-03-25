@@ -11,7 +11,11 @@ Follow these steps to get the project up and running:
     -e NEO4JLABS_PLUGINS='["apoc"]' \
     neo4j:latest
     ```
-3. Populate the graph database with the best_practices data. This can be done by running the following command:
+3. Install the required Python dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+4. Populate the graph database with the best_practices data. This can be done by running the following command:
     ```bash
     python3 populate_neo4j.py
     ```
@@ -23,11 +27,7 @@ Follow these steps to get the project up and running:
     ```
 
 ### 3. Run the Streamlit Application
-1. Install the required Python dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
-2. Start the Streamlit application:
+1. Start the Streamlit application:
     ```bash
     streamlit run st.py
     ```

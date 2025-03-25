@@ -14,6 +14,7 @@ from PyPDF2 import PdfReader
 import streamlit as st
 import numpy as np
 import re
+import os
 import time
 
 load_dotenv()
@@ -86,7 +87,10 @@ class ComplianceReport(BaseModel):
 
 
 # Initialize LangChain components
-graph = Neo4jGraph(url="bolt://localhost:7687", username="neo4j", password="password")
+NEO4J_URL = os.getenv("NEO4J_URL")
+NEO4J_USER = os.getenv("NEO4J_USER")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+graph = Neo4jGraph(url=NEO4J_URL, username=NEO4J_USER, password=NEO4J_PASSWORD)
 embeddings = OpenAIEmbeddings(disallowed_special=())
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
 llm = ChatOpenAI(
@@ -350,9 +354,12 @@ def main():
                             total_count = len(ki_status)
                             
                             # Determine if practice passes overall
-                            principle_status = "Pass" if failed_count < total_count // 2 else "Fail"
+                            # 80% threshold
+                            threshold = pass_percentage >= 80
+                            principle_status = "Pass" if threshold else "Fail"
                             
                             st.markdown(f"### Compliance Status")
+                            st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status}")
                             st.markdown(f"**Failed Indicators:** {failed_count}/{total_count}")
                             st.markdown(
                                 """
@@ -367,7 +374,6 @@ def main():
                                 unsafe_allow_html=True,
                             )
                             st.progress(pass_percentage/100, text=f"**Pass:** {pass_percentage:.1f}%")
-                            st.markdown(f"**Status:** {'🟢 ' if principle_status == 'Pass' else '🔴 '}{principle_status}")
 
                             # Separator between practices
                             st.markdown("---")

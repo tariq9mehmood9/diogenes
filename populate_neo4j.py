@@ -1,8 +1,15 @@
 from docx import Document as DocxDocument
 from langchain_neo4j import Neo4jGraph
+from dotenv import load_dotenv
 import re
+import os
 
-graph = Neo4jGraph(url="bolt://localhost:7687", username="neo4j", password="password")
+load_dotenv()
+
+NEO4J_URL = os.getenv("NEO4J_URL")
+NEO4J_USER = os.getenv("NEO4J_USER")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+graph = Neo4jGraph(url=NEO4J_URL, username=NEO4J_USER, password=NEO4J_PASSWORD)
 
 
 def read_docx(file_path):
