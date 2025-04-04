@@ -152,10 +152,36 @@ def check_compliance(practice_statement, key_indicator, vector_store, k=5):
     )
     return result
 
+from PIL import Image
+import streamlit as st
+import base64
+
+def get_base64_img(image_path):
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+image_base64 = get_base64_img("cybergov-icon.png")
 
 # Streamlit App
 def main():
-    st.title("CyberGov Powered by Diogenes")
+    st.set_page_config(
+        page_title="CyberGov",
+        page_icon="./favicon.png",
+        initial_sidebar_state="expanded",
+        layout="wide"
+    )
+    # st.title("CyberGov Powered by Diogenes")
+    st.markdown(
+    f"""
+    <div style='display: flex; align-items: center; justify-content: center; margin-top: 20px;'>
+        <h3 style='display: flex; align-items: end; gap: 10px;'>
+            <img src="data:image/png;base64,{image_base64}" style="height: 2em;" />
+            Powered by Diogenes
+        </h3>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
     # Add sidebar for weights configuration
     with st.sidebar:
